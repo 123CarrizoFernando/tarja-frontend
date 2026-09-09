@@ -5,7 +5,7 @@ import 'sectores_admin_screen.dart';
 import 'empleados_admin_screen.dart';
 import 'encargados_admin_screen.dart';
 import 'super_tarja_screen.dart';
-import 'dashboard_screen.dart'; // <-- Importamos el Dashboard
+import 'dashboard_screen.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -16,7 +16,7 @@ class AdminScreen extends StatelessWidget {
     if (context.mounted) Navigator.of(context).pushReplacementNamed('/');
   }
 
-  // Widget para crear las tarjetas horizontales tal como las tenías
+  // --- BOTONES MÁS GRANDES Y ESPACIOSOS ---
   Widget _crearBotonAccion(
     BuildContext context,
     String titulo,
@@ -25,23 +25,45 @@ class AdminScreen extends StatelessWidget {
     VoidCallback onTap,
   ) {
     return Card(
-      elevation: 1, // Sombra suave
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.grey.shade50, // Fondo apenitas gris/blanco
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: color,
-          radius: 22,
-          child: Icon(icono, color: Colors.white, size: 24),
-        ),
-        title: Text(
-          titulo,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-        ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16), // Más separación entre botones
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Colors.grey.shade50,
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            vertical: 12,
+          ), // Más altura a la tarjeta
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 4,
+            ),
+            leading: CircleAvatar(
+              backgroundColor: color,
+              radius: 28, // Círculo de color más grande
+              child: Icon(
+                icono,
+                color: Colors.white,
+                size: 30,
+              ), // Ícono más grande
+            ),
+            title: Text(
+              titulo,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+              ), // Letra más grande
+            ),
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: Colors.grey,
+              size: 28,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -52,11 +74,11 @@ class AdminScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Panel de Administración'),
-        backgroundColor: Colors.deepPurple, // El color violeta original
+        backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout), // Ícono de salida en la esquina
+            icon: const Icon(Icons.logout),
             tooltip: "Cerrar Sesión",
             onPressed: () => _cerrarSesion(context),
           ),
@@ -67,7 +89,6 @@ class AdminScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // El saludo inicial
             const Text(
               "Bienvenido, Administrador",
               style: TextStyle(
@@ -77,8 +98,6 @@ class AdminScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-
-            // La lista de botones
             Expanded(
               child: ListView(
                 children: [
@@ -86,7 +105,7 @@ class AdminScreen extends StatelessWidget {
                     context,
                     "Gestionar Sectores",
                     Icons.business,
-                    Colors.blue, // Azul como en la foto
+                    Colors.blue,
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -98,7 +117,7 @@ class AdminScreen extends StatelessWidget {
                     context,
                     "Gestionar Empleados",
                     Icons.people,
-                    Colors.green, // Verde como en la foto
+                    Colors.green,
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -110,7 +129,7 @@ class AdminScreen extends StatelessWidget {
                     context,
                     "Cuentas de Usuarios\n(Encargados)",
                     Icons.manage_accounts,
-                    Colors.indigo, // Azul oscuro como en la foto
+                    Colors.indigo,
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -122,7 +141,7 @@ class AdminScreen extends StatelessWidget {
                     context,
                     "Súper Tarja (Todos los\nsectores)",
                     Icons.table_view,
-                    Colors.orange, // Naranja como en la foto
+                    Colors.orange,
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -130,13 +149,11 @@ class AdminScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-
-                  // ¡EL NUEVO BOTÓN DEL DASHBOARD AL FINAL!
                   _crearBotonAccion(
                     context,
                     "Dashboard (Estadísticas)",
                     Icons.pie_chart,
-                    Colors.teal, // Le ponemos color verde azulado
+                    Colors.teal,
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(

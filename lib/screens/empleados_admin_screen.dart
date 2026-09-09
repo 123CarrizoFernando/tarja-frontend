@@ -260,7 +260,6 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // NUEVO: Filtramos la lista según lo que el usuario haya escrito en el buscador
     final empleadosFiltrados = _empleados.where((emp) {
       final query = _busqueda.toLowerCase();
       final nombre = emp['nombre_completo'].toString().toLowerCase();
@@ -276,7 +275,6 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
       ),
       body: Column(
         children: [
-          // NUEVO: La Barra de Búsqueda
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -296,38 +294,53 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
               },
             ),
           ),
-          // Lista de Empleados Filtrada
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : empleadosFiltrados.isEmpty
-                ? const Center(child: Text("No se encontraron empleados"))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: empleadosFiltrados.length,
-                    itemBuilder: (context, index) {
-                      final emp = empleadosFiltrados[index];
-                      return Card(
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Colors.green,
-                            child: Icon(Icons.person, color: Colors.white),
+                : RefreshIndicator(
+                    onRefresh: _cargarDatos,
+                    color: Colors.green,
+                    child: empleadosFiltrados.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 150),
+                              Center(
+                                child: Text("No se encontraron empleados"),
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(8),
+                            itemCount: empleadosFiltrados.length,
+                            itemBuilder: (context, index) {
+                              final emp = empleadosFiltrados[index];
+                              return Card(
+                                child: ListTile(
+                                  leading: const CircleAvatar(
+                                    backgroundColor: Colors.green,
+                                    child: Icon(Icons.person, color: Colors.white),
+                                  ),
+                                  title: Text(
+                                    emp['nombre_completo'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    "Legajo: ${emp['legajo']} - Sector: ${emp['sector_nombre']}",
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.edit, color: Colors.blue),
+                                    onPressed: () => _mostrarDialogoEmpleado(
+                                      empleadoExistente: emp,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                          title: Text(
-                            emp['nombre_completo'],
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            "Legajo: ${emp['legajo']} - Sector: ${emp['sector_nombre']}",
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () =>
-                                _mostrarDialogoEmpleado(empleadoExistente: emp),
-                          ),
-                        ),
-                      );
-                    },
                   ),
           ),
         ],
@@ -335,8 +348,10 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _sectores.isEmpty
             ? () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Debe crear un sector primero')),
-              )
+                  const SnackBar(
+                    content: Text('Debe crear un sector primero'),
+                  ),
+                )
             : () => _mostrarDialogoEmpleado(),
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,

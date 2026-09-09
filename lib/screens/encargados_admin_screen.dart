@@ -212,50 +212,68 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
         foregroundColor: Colors.white,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: _encargados.length,
-              itemBuilder: (context, index) {
-                final enc = _encargados[index];
-                final esAdmin = enc['rol'] == 'admin';
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.deepPurple),
+            )
+          : RefreshIndicator(
+              onRefresh: _cargarDatos,
+              color: Colors.deepPurple,
+              child: _encargados.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 150),
+                        Center(
+                          child: Text("No hay usuarios registrados"),
+                        ),
+                      ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(8),
+                      itemCount: _encargados.length,
+                      itemBuilder: (context, index) {
+                        final enc = _encargados[index];
+                        final esAdmin = enc['rol'] == 'admin';
 
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: esAdmin
-                          ? Colors.redAccent
-                          : Colors.deepPurple,
-                      child: Icon(
-                        esAdmin ? Icons.admin_panel_settings : Icons.badge,
-                        color: Colors.white,
-                      ),
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor:
+                                  esAdmin ? Colors.redAccent : Colors.deepPurple,
+                              child: Icon(
+                                esAdmin
+                                    ? Icons.admin_panel_settings
+                                    : Icons.badge,
+                                color: Colors.white,
+                              ),
+                            ),
+                            title: Text(
+                              enc['usuario'],
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              esAdmin
+                                  ? "Administrador Global"
+                                  : "Sector: ${enc['sector_nombre']}",
+                            ),
+                            trailing: Text(
+                              enc['rol'].toString().toUpperCase(),
+                              style: TextStyle(
+                                color: esAdmin ? Colors.red : Colors.grey,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    title: Text(
-                      enc['usuario'],
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      esAdmin
-                          ? "Administrador Global"
-                          : "Sector: ${enc['sector_nombre']}",
-                    ),
-                    trailing: Text(
-                      enc['rol'].toString().toUpperCase(),
-                      style: TextStyle(
-                        color: esAdmin ? Colors.red : Colors.grey,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                );
-              },
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _sectores.isEmpty
             ? () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cree un sector primero')),
-              )
+                  const SnackBar(content: Text('Cree un sector primero')),
+                )
             : _mostrarDialogoNuevoEncargado,
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,

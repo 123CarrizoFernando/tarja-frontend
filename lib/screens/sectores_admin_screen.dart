@@ -162,34 +162,50 @@ class _SectoresAdminScreenState extends State<SectoresAdminScreen> {
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: _sectores.length,
-              itemBuilder: (context, index) {
-                final sector = _sectores[index];
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.blue.shade100,
-                      child: Text(
-                        sector['id'].toString(),
-                        style: const TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+          // ... (acá arriba seguro tenés el body: _isLoading ? const Center(...) )
+          : RefreshIndicator(
+              onRefresh: _cargarSectores, // Llama a tu función para refrescar
+              color: Colors.blueAccent, // Combina con tu botón azul
+              child: _sectores.isEmpty
+                  // Si no hay sectores, mostramos un cartel pero que se pueda deslizar
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 150),
+                        Center(child: Text("No hay sectores registrados")),
+                      ],
+                    )
+                  // Si hay sectores, mostramos tu lista normal
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(), // ¡LA LÍNEA MÁGICA!
+                      padding: const EdgeInsets.all(12),
+                      itemCount: _sectores.length,
+                      itemBuilder: (context, index) {
+                        final sector = _sectores[index];
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.blue.shade100,
+                              child: Text(
+                                sector['id'].toString(),
+                                style: const TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              sector['nombre'],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                            subtitle: Text("ID del Sistema: ${sector['id']}"),
+                          ),
+                        );
+                      },
                     ),
-                    title: Text(
-                      sector['nombre'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                    subtitle: Text("ID del Sistema: ${sector['id']}"),
-                  ),
-                );
-              },
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _mostrarDialogoNuevoSector,
