@@ -746,250 +746,275 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Expanded(
-            child: _empleadosLocales.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Toca sincronizar para descargar empleados.',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                : empleadosFiltrados.isEmpty
-                ? const Center(
-                    child: Text('No se encontraron empleados en la búsqueda'),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 80),
-                    itemCount: empleadosFiltrados.length,
-                    itemBuilder: (context, index) {
-                      final emp = empleadosFiltrados[index];
-                      final empleadoId = emp['id'];
-                      final horarios = _asistenciasHoy[empleadoId] ?? {};
-                      final horaLlegada = horarios['llegada'];
-                      final horaSalida = horarios['salida'];
-                      final estado = horarios['estado'] ?? 'Presente';
-                      final yaLlego = horaLlegada != null;
-                      final yaSeFue = horaSalida != null;
-                      final esPresente = (estado == 'Presente');
-
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
+            child: RefreshIndicator(
+              onRefresh: _isSyncing ? () async {} : _sincronizarConServidor,
+              child: _empleadosLocales.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(
+                          height: 300,
+                          child: Center(
+                            child: Text(
+                              'Deslizá hacia abajo para sincronizar.',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          emp['nombre_completo'],
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Legajo: ${emp['legajo']}',
-                                          style: const TextStyle(
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.history,
-                                          color: Colors.blueAccent,
-                                        ),
-                                        onPressed: _isSyncing
-                                            ? null
-                                            : () => _verHistorialEmpleado(
-                                                empleadoId,
-                                                emp['nombre_completo'],
-                                              ),
-                                      ),
-                                      PopupMenuButton<String>(
-                                        icon: const Icon(
-                                          Icons.more_vert,
-                                          color: Colors.grey,
-                                        ),
-                                        onSelected: (valor) =>
-                                            _cambiarEstadoGlobal(
-                                              empleadoId,
-                                              valor,
-                                            ),
-                                        itemBuilder: (context) => [
-                                          const PopupMenuItem(
-                                            value: "Presente",
-                                            child: Text(
-                                              "Marcar como Presente (Normal)",
-                                            ),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: "Falta",
-                                            child: Text(
-                                              "Marcar Falta Injustificada",
-                                            ),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: "Licencia",
-                                            child: Text(
-                                              "Marcar Licencia / Justificado",
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              if (esPresente)
+                      ],
+                    )
+                  : empleadosFiltrados.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(
+                          height: 300,
+                          child: Center(
+                            child: Text(
+                              'No se encontraron empleados en la búsqueda',
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 80),
+                      itemCount: empleadosFiltrados.length,
+                      itemBuilder: (context, index) {
+                        final emp = empleadosFiltrados[index];
+                        final empleadoId = emp['id'];
+                        final horarios = _asistenciasHoy[empleadoId] ?? {};
+                        final horaLlegada = horarios['llegada'];
+                        final horaSalida = horarios['salida'];
+                        final estado = horarios['estado'] ?? 'Presente';
+                        final yaLlego = horaLlegada != null;
+                        final yaSeFue = horaSalida != null;
+                        final esPresente = (estado == 'Presente');
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Column(
-                                      children: [
-                                        ElevatedButton(
-                                          onPressed: yaLlego
-                                              ? null
-                                              : () =>
-                                                    _marcarLlegada(empleadoId),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green,
-                                            foregroundColor: Colors.white,
-                                            disabledBackgroundColor:
-                                                Colors.grey.shade300,
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            emp['nombre_completo'],
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
                                           ),
-                                          child: const Text("Llegada"),
-                                        ),
-                                        if (yaLlego)
-                                          Row(
-                                            children: [
-                                              Text(
-                                                horaLlegada,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.green,
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.edit,
-                                                  size: 16,
-                                                  color: Colors.grey,
-                                                ),
-                                                onPressed: () => _editarHora(
-                                                  empleadoId,
-                                                  true,
-                                                ),
-                                                padding: EdgeInsets.zero,
-                                                constraints:
-                                                    const BoxConstraints(),
-                                              ),
-                                            ],
+                                          Text(
+                                            'Legajo: ${emp['legajo']}',
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                            ),
                                           ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                    Column(
+                                    Row(
                                       children: [
-                                        ElevatedButton(
-                                          onPressed: (yaLlego && !yaSeFue)
-                                              ? () => _marcarSalida(empleadoId)
-                                              : null,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.orange,
-                                            foregroundColor: Colors.white,
-                                            disabledBackgroundColor:
-                                                Colors.grey.shade300,
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.history,
+                                            color: Colors.blueAccent,
                                           ),
-                                          child: const Text("Salida"),
-                                        ),
-                                        if (yaSeFue)
-                                          Row(
-                                            children: [
-                                              Text(
-                                                horaSalida,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.orange,
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.edit,
-                                                  size: 16,
-                                                  color: Colors.grey,
-                                                ),
-                                                onPressed: () => _editarHora(
+                                          onPressed: _isSyncing
+                                              ? null
+                                              : () => _verHistorialEmpleado(
                                                   empleadoId,
-                                                  false,
+                                                  emp['nombre_completo'],
                                                 ),
-                                                padding: EdgeInsets.zero,
-                                                constraints:
-                                                    const BoxConstraints(),
-                                              ),
-                                            ],
+                                        ),
+                                        PopupMenuButton<String>(
+                                          icon: const Icon(
+                                            Icons.more_vert,
+                                            color: Colors.grey,
                                           ),
+                                          onSelected: (valor) =>
+                                              _cambiarEstadoGlobal(
+                                                empleadoId,
+                                                valor,
+                                              ),
+                                          itemBuilder: (context) => [
+                                            const PopupMenuItem(
+                                              value: "Presente",
+                                              child: Text(
+                                                "Marcar como Presente (Normal)",
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: "Falta",
+                                              child: Text(
+                                                "Marcar Falta Injustificada",
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: "Licencia",
+                                              child: Text(
+                                                "Marcar Licencia / Justificado",
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ],
                                     ),
                                   ],
-                                )
-                              else
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: estado == "Falta"
-                                        ? Colors.red.shade100
-                                        : Colors.orange.shade100,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                ),
+                                const SizedBox(height: 12),
+                                if (esPresente)
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Icon(
-                                        estado == "Falta"
-                                            ? Icons.cancel
-                                            : Icons.beach_access,
-                                        color: estado == "Falta"
-                                            ? Colors.red
-                                            : Colors.orange.shade800,
+                                      Column(
+                                        children: [
+                                          ElevatedButton(
+                                            onPressed: yaLlego
+                                                ? null
+                                                : () => _marcarLlegada(
+                                                    empleadoId,
+                                                  ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.green,
+                                              foregroundColor: Colors.white,
+                                              disabledBackgroundColor:
+                                                  Colors.grey.shade300,
+                                            ),
+                                            child: const Text("Llegada"),
+                                          ),
+                                          if (yaLlego)
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  horaLlegada,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.green,
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.edit,
+                                                    size: 16,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  onPressed: () => _editarHora(
+                                                    empleadoId,
+                                                    true,
+                                                  ),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                ),
+                                              ],
+                                            ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        "EMPLEADO CON ${estado.toUpperCase()}",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: estado == "Falta"
-                                              ? Colors.red.shade800
-                                              : Colors.orange.shade800,
-                                        ),
+                                      Column(
+                                        children: [
+                                          ElevatedButton(
+                                            onPressed: (yaLlego && !yaSeFue)
+                                                ? () =>
+                                                      _marcarSalida(empleadoId)
+                                                : null,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.orange,
+                                              foregroundColor: Colors.white,
+                                              disabledBackgroundColor:
+                                                  Colors.grey.shade300,
+                                            ),
+                                            child: const Text("Salida"),
+                                          ),
+                                          if (yaSeFue)
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  horaSalida,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.orange,
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.edit,
+                                                    size: 16,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  onPressed: () => _editarHora(
+                                                    empleadoId,
+                                                    false,
+                                                  ),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                ),
+                                              ],
+                                            ),
+                                        ],
                                       ),
                                     ],
+                                  )
+                                else
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: estado == "Falta"
+                                          ? Colors.red.shade100
+                                          : Colors.orange.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          estado == "Falta"
+                                              ? Icons.cancel
+                                              : Icons.beach_access,
+                                          color: estado == "Falta"
+                                              ? Colors.red
+                                              : Colors.orange.shade800,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          "EMPLEADO CON ${estado.toUpperCase()}",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: estado == "Falta"
+                                                ? Colors.red.shade800
+                                                : Colors.orange.shade800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    ),
+            ),
           ),
         ],
       ),
