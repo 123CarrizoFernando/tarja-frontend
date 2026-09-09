@@ -5,7 +5,7 @@ import 'sectores_admin_screen.dart';
 import 'empleados_admin_screen.dart';
 import 'encargados_admin_screen.dart';
 import 'super_tarja_screen.dart';
-import 'dashboard_screen.dart'; // <-- Importamos la nueva pantalla
+import 'dashboard_screen.dart'; // <-- Importamos el Dashboard
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -16,6 +16,7 @@ class AdminScreen extends StatelessWidget {
     if (context.mounted) Navigator.of(context).pushReplacementNamed('/');
   }
 
+  // Widget para crear las tarjetas horizontales tal como las tenías
   Widget _crearBotonAccion(
     BuildContext context,
     String titulo,
@@ -24,29 +25,23 @@ class AdminScreen extends StatelessWidget {
     VoidCallback onTap,
   ) {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(15),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icono, size: 40, color: color),
-              const SizedBox(height: 10),
-              Text(
-                titulo,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
+      elevation: 1, // Sombra suave
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.grey.shade50, // Fondo apenitas gris/blanco
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: color,
+          radius: 22,
+          child: Icon(icono, color: Colors.white, size: 24),
         ),
+        title: Text(
+          titulo,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+        onTap: onTap,
       ),
     );
   }
@@ -54,13 +49,14 @@ class AdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Panel de Administración'),
-        backgroundColor: Colors.blueGrey.shade900,
+        backgroundColor: Colors.deepPurple, // El color violeta original
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout), // Ícono de salida en la esquina
             tooltip: "Cerrar Sesión",
             onPressed: () => _cerrarSesion(context),
           ),
@@ -68,70 +64,87 @@ class AdminScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16.0,
-          mainAxisSpacing: 16.0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _crearBotonAccion(
-              context,
-              "Sectores",
-              Icons.business,
-              Colors.purple,
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SectoresAdminScreen(),
-                ),
+            // El saludo inicial
+            const Text(
+              "Bienvenido, Administrador",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
               ),
             ),
-            _crearBotonAccion(
-              context,
-              "Empleados",
-              Icons.people,
-              Colors.green,
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EmpleadosAdminScreen(),
-                ),
-              ),
-            ),
-            _crearBotonAccion(
-              context,
-              "Encargados",
-              Icons.manage_accounts,
-              Colors.indigo,
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EncargadosAdminScreen(),
-                ),
-              ),
-            ),
-            _crearBotonAccion(
-              context,
-              "Súper Tarja",
-              Icons.table_view,
-              Colors.orange,
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SuperTarjaScreen(),
-                ),
-              ),
-            ),
-            // EL NUEVO BOTÓN
-            _crearBotonAccion(
-              context,
-              "Estadísticas",
-              Icons.pie_chart,
-              Colors.teal,
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const DashboardScreen(),
-                ),
+            const SizedBox(height: 20),
+
+            // La lista de botones
+            Expanded(
+              child: ListView(
+                children: [
+                  _crearBotonAccion(
+                    context,
+                    "Gestionar Sectores",
+                    Icons.business,
+                    Colors.blue, // Azul como en la foto
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SectoresAdminScreen(),
+                      ),
+                    ),
+                  ),
+                  _crearBotonAccion(
+                    context,
+                    "Gestionar Empleados",
+                    Icons.people,
+                    Colors.green, // Verde como en la foto
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EmpleadosAdminScreen(),
+                      ),
+                    ),
+                  ),
+                  _crearBotonAccion(
+                    context,
+                    "Cuentas de Usuarios\n(Encargados)",
+                    Icons.manage_accounts,
+                    Colors.indigo, // Azul oscuro como en la foto
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EncargadosAdminScreen(),
+                      ),
+                    ),
+                  ),
+                  _crearBotonAccion(
+                    context,
+                    "Súper Tarja (Todos los\nsectores)",
+                    Icons.table_view,
+                    Colors.orange, // Naranja como en la foto
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SuperTarjaScreen(),
+                      ),
+                    ),
+                  ),
+
+                  // ¡EL NUEVO BOTÓN DEL DASHBOARD AL FINAL!
+                  _crearBotonAccion(
+                    context,
+                    "Dashboard (Estadísticas)",
+                    Icons.pie_chart,
+                    Colors.teal, // Le ponemos color verde azulado
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const DashboardScreen(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
