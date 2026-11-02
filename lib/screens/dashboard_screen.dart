@@ -206,14 +206,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           getTitlesWidget: (double value, TitleMeta meta) {
                                             if (value.toInt() >=
                                                 _dashboardData['ranking_mes']
-                                                    .length)
+                                                    .length) {
                                               return const SizedBox.shrink();
+                                            }
                                             String nombre =
                                                 _dashboardData['ranking_mes'][value
                                                     .toInt()]['sector'];
-                                            if (nombre.length > 10)
+                                            if (nombre.length > 10) {
                                               nombre =
                                                   "${nombre.substring(0, 10)}...";
+                                            }
 
                                             // ¡ACÁ ESTÁ LA CORRECCIÓN DEL ERROR!
                                             return SideTitleWidget(

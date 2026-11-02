@@ -24,9 +24,7 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
   }
 
   Future<void> _cargarDatos() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
@@ -48,25 +46,23 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _crearEncargado(
     String usuario,
     String password,
-    int sectorId,
+    String rol,
+    int? sectorId,
   ) async {
     Navigator.pop(context);
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -81,7 +77,8 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
         body: json.encode({
           "usuario": usuario,
           "password": password,
-          "sector_id": sectorId,
+          "rol": rol,
+          "sector_id": rol == "encargado" ? sectorId : null,
         }),
       );
 
@@ -96,28 +93,24 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
         }
         await _cargarDatos();
       } else {
-        try {
-          final error = json.decode(response.body);
-          throw Exception(error['detail'] ?? "Error al crear");
-        } catch (_) {
-          throw Exception("Error del servidor (${response.statusCode})");
-        }
+        final error = json.decode(response.body);
+        throw Exception(error['detail'] ?? "Error al crear usuario");
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _mostrarDialogoNuevoEncargado() {
     final usuarioController = TextEditingController();
     final passwordController = TextEditingController();
+    String rolSeleccionado = "encargado";
     int? sectorSeleccionado;
 
     showDialog(
@@ -126,7 +119,7 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              title: const Text('Nuevo Usuario (Encargado)'),
+              title: const Text('Crear Cuenta de Usuario'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -145,27 +138,50 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                       ),
                     ),
                     const SizedBox(height: 15),
-                    DropdownButtonFormField<int>(
+                    DropdownButtonFormField<String>(
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: 'Sector a cargo',
+                        labelText: 'Tipo de Cuenta',
                       ),
-                      value: sectorSeleccionado,
-                      items: _sectores.map<DropdownMenuItem<int>>((sector) {
-                        return DropdownMenuItem<int>(
-                          value: sector['id'],
-                          child: Text(
-                            sector['nombre'],
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
+                      value: rolSeleccionado,
+                      items: const [
+                        DropdownMenuItem(
+                          value: "encargado",
+                          child: Text("Encargado de Sector"),
+                        ),
+                        DropdownMenuItem(
+                          value: "admin",
+                          child: Text("ADMINISTRADOR"),
+                        ),
+                      ],
                       onChanged: (valor) {
-                        setStateDialog(() {
-                          sectorSeleccionado = valor;
-                        });
+                        if (valor != null) {
+                          setStateDialog(() => rolSeleccionado = valor);
+                        }
                       },
                     ),
+                    if (rolSeleccionado == "encargado") ...[
+                      const SizedBox(height: 15),
+                      DropdownButtonFormField<int>(
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Sector a cargo',
+                        ),
+                        value: sectorSeleccionado,
+                        items: _sectores.map<DropdownMenuItem<int>>((sector) {
+                          return DropdownMenuItem<int>(
+                            value: sector['id'],
+                            child: Text(
+                              sector['nombre'],
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (valor) {
+                          setStateDialog(() => sectorSeleccionado = valor);
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -179,13 +195,18 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (usuarioController.text.isNotEmpty &&
-                        passwordController.text.isNotEmpty &&
-                        sectorSeleccionado != null) {
+                    final userOk = usuarioController.text.trim().isNotEmpty;
+                    final passOk = passwordController.text.trim().isNotEmpty;
+                    final sectorOk =
+                        rolSeleccionado != "encargado" ||
+                        sectorSeleccionado != null;
+
+                    if (userOk && passOk && sectorOk) {
                       _crearEncargado(
                         usuarioController.text.trim(),
                         passwordController.text.trim(),
-                        sectorSeleccionado!,
+                        rolSeleccionado,
+                        sectorSeleccionado,
                       );
                     }
                   },
@@ -223,9 +244,7 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: const [
                         SizedBox(height: 150),
-                        Center(
-                          child: Text("No hay usuarios registrados"),
-                        ),
+                        Center(child: Text("No hay usuarios registrados")),
                       ],
                     )
                   : ListView.builder(
@@ -234,13 +253,15 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                       itemCount: _encargados.length,
                       itemBuilder: (context, index) {
                         final enc = _encargados[index];
-                        final esAdmin = enc['rol'] == 'admin';
+                        final esAdmin =
+                            enc['rol'] == 'admin' || enc['rol'] == 'rrhh';
 
                         return Card(
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor:
-                                  esAdmin ? Colors.redAccent : Colors.deepPurple,
+                              backgroundColor: esAdmin
+                                  ? Colors.redAccent
+                                  : Colors.deepPurple,
                               child: Icon(
                                 esAdmin
                                     ? Icons.admin_panel_settings
@@ -250,15 +271,17 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                             ),
                             title: Text(
                               enc['usuario'],
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             subtitle: Text(
                               esAdmin
-                                  ? "Administrador Global"
+                                  ? "ADMINISTRADOR (Todos los sectores)"
                                   : "Sector: ${enc['sector_nombre']}",
                             ),
                             trailing: Text(
-                              enc['rol'].toString().toUpperCase(),
+                              esAdmin ? "ADMIN" : "ENCARGADO",
                               style: TextStyle(
                                 color: esAdmin ? Colors.red : Colors.grey,
                                 fontWeight: FontWeight.bold,
@@ -270,15 +293,11 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                     ),
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _sectores.isEmpty
-            ? () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Cree un sector primero')),
-                )
-            : _mostrarDialogoNuevoEncargado,
+        onPressed: _mostrarDialogoNuevoEncargado,
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add),
-        label: const Text("NUEVO ENCARGADO"),
+        label: const Text("NUEVO USUARIO"),
       ),
     );
   }

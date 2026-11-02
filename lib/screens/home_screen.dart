@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 
@@ -21,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<int, Map<String, String?>> _asistenciasHoy = {};
   bool _isSyncing = false;
   String _busqueda = "";
+  Timer? _relojEnVivo;
 
   final TextEditingController _correoController = TextEditingController();
   final String baseUrl = "https://tarja-api.onrender.com";
@@ -29,6 +31,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _cargarDatosIniciales();
+    // Refresca el contador de horas en pantalla cada 30 segundos
+    _relojEnVivo = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _relojEnVivo?.cancel();
+    _correoController.dispose();
+    super.dispose();
   }
 
   Future<void> _cargarDatosIniciales() async {
@@ -38,26 +51,88 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _cargarEmpleadosDesdeCelular() async {
     final datos = await DBHelper.obtenerEmpleadosLocales();
-    setState(() {
-      _empleadosLocales = datos;
-    });
+    if (mounted) {
+      setState(() {
+        _empleadosLocales = datos;
+      });
+    }
   }
 
   Future<void> _cargarAsistenciasLocales() async {
     final registros = await DBHelper.obtenerAsistenciasHoy();
-    setState(() {
-      _asistenciasHoy.clear();
-      for (var item in registros) {
-        _asistenciasHoy[item['empleado_id'] as int] = {
-          'llegada': item['hora_llegada'] as String?,
-          'salida': item['hora_salida'] as String?,
-          // Intentamos leer el estado (por si ya existe en la DB local), si no, por defecto es Presente
-          'estado': item.containsKey('estado')
-              ? (item['estado'] as String?) ?? 'Presente'
-              : 'Presente',
-        };
+    if (mounted) {
+      setState(() {
+        _asistenciasHoy.clear();
+        for (var item in registros) {
+          _asistenciasHoy[item['empleado_id'] as int] = {
+            'llegada': item['hora_llegada'] as String?,
+            'salida': item['hora_salida'] as String?,
+            'estado': item.containsKey('estado')
+                ? (item['estado'] as String?) ?? 'Presente'
+                : 'Presente',
+          };
+        }
+      });
+    }
+  }
+
+  // --- FUNCIÓN CALCULADORA DE LAS 6 HORAS Y TIEMPO TRANSCURRIDO ---
+  Map<String, dynamic> _calcularProgresoJornada(
+    String? horaLlegada,
+    String? horaSalida,
+  ) {
+    if (horaLlegada == null || horaLlegada.isEmpty) {
+      return {
+        "trabajado": "00h 00m",
+        "salida_estimada": "--:--",
+        "cumplido": false,
+      };
+    }
+    try {
+      final ahora = DateTime.now();
+      final pIn = horaLlegada.split(":");
+      final dtIngreso = DateTime(
+        ahora.year,
+        ahora.month,
+        ahora.day,
+        int.parse(pIn[0]),
+        int.parse(pIn[1]),
+      );
+
+      // Si llega 07:10, sumamos 6 horas -> debe salir 13:10
+      final dtSalidaEstimada = dtIngreso.add(const Duration(hours: 6));
+      final salidaEstimadaStr =
+          "${dtSalidaEstimada.hour.toString().padLeft(2, '0')}:${dtSalidaEstimada.minute.toString().padLeft(2, '0')}";
+
+      DateTime dtFin = ahora;
+      if (horaSalida != null && horaSalida.isNotEmpty) {
+        final pOut = horaSalida.split(":");
+        dtFin = DateTime(
+          ahora.year,
+          ahora.month,
+          ahora.day,
+          int.parse(pOut[0]),
+          int.parse(pOut[1]),
+        );
       }
-    });
+
+      final diff = dtFin.difference(dtIngreso);
+      final minutosTotales = diff.inMinutes < 0 ? 0 : diff.inMinutes;
+      final h = (minutosTotales ~/ 60).toString().padLeft(2, '0');
+      final m = (minutosTotales % 60).toString().padLeft(2, '0');
+
+      return {
+        "trabajado": "${h}h ${m}m",
+        "salida_estimada": salidaEstimadaStr,
+        "cumplido": minutosTotales >= 360,
+      };
+    } catch (_) {
+      return {
+        "trabajado": "00h 00m",
+        "salida_estimada": "--:--",
+        "cumplido": false,
+      };
+    }
   }
 
   String _obtenerHoraActual() {
@@ -100,7 +175,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- NUEVA FUNCIÓN: ENVIAR FALTA O LICENCIA AL SERVIDOR ---
   Future<void> _cambiarEstadoGlobal(int empleadoId, String estado) async {
     setState(() {
       _isSyncing = true;
@@ -110,7 +184,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final token = prefs.getString('token');
       if (token == null) throw Exception("Sin sesión");
 
-      // Llamada directa al servidor (¡Requiere Internet!)
       final url = Uri.parse(
         '$baseUrl/asistencias/$empleadoId/estado?estado=$estado',
       );
@@ -120,19 +193,18 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Actualizamos la pantalla instantáneamente
-        setState(() {
-          if (_asistenciasHoy[empleadoId] == null) {
-            _asistenciasHoy[empleadoId] = {};
-          }
-          _asistenciasHoy[empleadoId]!['estado'] = estado;
-
-          // Si faltó, reseteamos las horas en la memoria visual de la app
-          if (estado != "Presente") {
-            _asistenciasHoy[empleadoId]!['llegada'] = null;
-            _asistenciasHoy[empleadoId]!['salida'] = null;
-          }
+        final fechaHoy =
+            "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+        // Guardamos también en SQLite del celular para que persista al cerrar sesión
+        await DBHelper.guardarAsistenciaDesdeNube({
+          'empleado_id': empleadoId,
+          'fecha': fechaHoy,
+          'hora_llegada': null,
+          'hora_salida': null,
+          'estado': estado,
         });
+
+        await _cargarAsistenciasLocales();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -155,9 +227,11 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isSyncing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
     }
   }
 
@@ -241,9 +315,11 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isSyncing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
     }
   }
 
@@ -313,9 +389,11 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isSyncing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
     }
   }
 
@@ -361,9 +439,11 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isSyncing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
     }
   }
 
@@ -473,6 +553,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.date_range, color: Colors.blueAccent),
+                title: const Text('Descargar PDF por rango de fechas'),
+                subtitle: const Text('Seleccionar el periodo del reporte'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _elegirRangoYDescargar();
+                },
               ),
               ListTile(
                 leading: const Icon(
@@ -597,9 +686,11 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isSyncing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
     }
   }
 
@@ -693,7 +784,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // FILTRAMOS LOS EMPLEADOS DEL ENCARGADO
     final empleadosFiltrados = _empleadosLocales.where((emp) {
       final query = _busqueda.toLowerCase();
       final nombre = emp['nombre_completo'].toString().toLowerCase();
@@ -708,10 +798,12 @@ class _HomeScreenState extends State<HomeScreen> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.date_range),
-            onPressed: _isSyncing ? null : _elegirRangoYDescargar,
+            tooltip: "Opciones de reporte",
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: _isSyncing ? null : _mostrarOpcionesCierre,
           ),
           IconButton(
+            tooltip: "Sincronizar con el servidor",
             icon: _isSyncing
                 ? const SizedBox(
                     width: 20,
@@ -724,12 +816,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 : const Icon(Icons.sync),
             onPressed: _isSyncing ? null : _sincronizarConServidor,
           ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: _cerrarSesion),
+          IconButton(
+            tooltip: "Cerrar Sesión",
+            icon: const Icon(Icons.logout),
+            onPressed: _cerrarSesion,
+          ),
         ],
       ),
       body: Column(
         children: [
-          // BARRA DE BÚSQUEDA DEL ENCARGADO
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -791,6 +886,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         final yaLlego = horaLlegada != null;
                         final yaSeFue = horaSalida != null;
                         final esPresente = (estado == 'Presente');
+                        final progreso = _calcularProgresoJornada(
+                          horaLlegada,
+                          horaSalida,
+                        );
 
                         return Card(
                           margin: const EdgeInsets.symmetric(
@@ -819,7 +918,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             ),
                                           ),
                                           Text(
-                                            'Legajo: ${emp['legajo']}',
+                                            'Legajo: ${emp['legajo']} \vert{} DNI:${emp['dni'] ?? '-'}',
                                             style: const TextStyle(
                                               color: Colors.grey,
                                             ),
@@ -877,7 +976,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                if (esPresente)
+                                if (esPresente) ...[
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
@@ -970,8 +1069,55 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ],
                                       ),
                                     ],
-                                  )
-                                else
+                                  ),
+                                  // --- CARTEL EN VIVO DE HORAS Y SALIDA ESTIMADA (6 HS) ---
+                                  if (yaLlego) ...[
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: progreso['cumplido'] == true
+                                            ? Colors.green.shade50
+                                            : Colors.blue.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: progreso['cumplido'] == true
+                                              ? Colors.green.shade300
+                                              : Colors.blue.shade200,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            yaSeFue
+                                                ? "✅ Total trabajado: ${progreso['trabajado']}"
+                                                : "⏱️ En curso: ${progreso['trabajado']} realizados",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color:
+                                                  progreso['cumplido'] == true
+                                                  ? Colors.green.shade900
+                                                  : Colors.blue.shade900,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            "Para cumplir 6 hs debe salir a las: ${progreso['salida_estimada']} hs",
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ] else
                                   Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.symmetric(
@@ -1019,8 +1165,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isSyncing ? null : _mostrarOpcionesCierre,
-        backgroundColor: Colors.redAccent,
+        onPressed: _isSyncing ? null : _sincronizarConServidor,
+        backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
         icon: _isSyncing
             ? const SizedBox(
@@ -1031,9 +1177,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   strokeWidth: 2,
                 ),
               )
-            : const Icon(Icons.picture_as_pdf),
+            : const Icon(Icons.cloud_upload),
         label: Text(
-          _isSyncing ? "PROCESANDO..." : "CERRAR JORNADA",
+          _isSyncing ? "SINCRONIZANDO..." : "GUARDAR Y SINCRONIZAR TARJA",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),

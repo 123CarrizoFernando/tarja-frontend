@@ -2,13 +2,18 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DBHelper {
+  static String _fechaLocalHoy() {
+    final ahora = DateTime.now();
+    return "${ahora.year}-${ahora.month.toString().padLeft(2, '0')}-${ahora.day.toString().padLeft(2, '0')}";
+  }
+
   static Future<Database> getDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'tarja_offline.db');
 
     return openDatabase(
       path,
-      version: 3, // <-- SUBIMOS LA VERSIÓN A 3 PARA ACTUALIZAR LA BASE
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE empleados (
@@ -26,7 +31,7 @@ class DBHelper {
             fecha TEXT,
             hora_llegada TEXT,
             hora_salida TEXT,
-            estado TEXT DEFAULT 'Presente', -- <-- NUEVA COLUMNA
+            estado TEXT DEFAULT 'Presente',
             sincronizado INTEGER DEFAULT 0
           )
         ''');
@@ -46,7 +51,6 @@ class DBHelper {
           ''');
         }
         if (oldVersion < 3) {
-          // Si el celular ya tenía la versión 2, le inyectamos la columna nueva sin borrarle los datos
           await db.execute(
             "ALTER TABLE asistencias ADD COLUMN estado TEXT DEFAULT 'Presente'",
           );
@@ -78,7 +82,7 @@ class DBHelper {
 
   static Future<void> registrarLlegadaLocal(int empleadoId, String hora) async {
     final db = await getDatabase();
-    final fechaHoy = DateTime.now().toIso8601String().split('T')[0];
+    final fechaHoy = _fechaLocalHoy();
 
     final existe = await db.query(
       'asistencias',
@@ -91,7 +95,7 @@ class DBHelper {
         'empleado_id': empleadoId,
         'fecha': fechaHoy,
         'hora_llegada': hora,
-        'estado': 'Presente', // Forzamos a presente si llegó
+        'estado': 'Presente',
         'sincronizado': 0,
       });
     } else {
@@ -106,7 +110,7 @@ class DBHelper {
 
   static Future<void> registrarSalidaLocal(int empleadoId, String hora) async {
     final db = await getDatabase();
-    final fechaHoy = DateTime.now().toIso8601String().split('T')[0];
+    final fechaHoy = _fechaLocalHoy();
 
     await db.update(
       'asistencias',
@@ -118,7 +122,7 @@ class DBHelper {
 
   static Future<List<Map<String, dynamic>>> obtenerAsistenciasHoy() async {
     final db = await getDatabase();
-    final fechaHoy = DateTime.now().toIso8601String().split('T')[0];
+    final fechaHoy = _fechaLocalHoy();
     return db.query('asistencias', where: 'fecha = ?', whereArgs: [fechaHoy]);
   }
 
@@ -152,8 +156,7 @@ class DBHelper {
         'fecha': asis['fecha'],
         'hora_llegada': asis['hora_llegada'],
         'hora_salida': asis['hora_salida'],
-        'estado':
-            asis['estado'] ?? 'Presente', // <-- AHORA SÍ GUARDAMOS EL ESTADO
+        'estado': asis['estado'] ?? 'Presente',
         'sincronizado': 1,
       });
     } else {
@@ -162,9 +165,7 @@ class DBHelper {
         {
           'hora_llegada': asis['hora_llegada'],
           'hora_salida': asis['hora_salida'],
-          'estado':
-              asis['estado'] ??
-              'Presente', // <-- AHORA SÍ ACTUALIZAMOS EL ESTADO
+          'estado': asis['estado'] ?? 'Presente',
           'sincronizado': 1,
         },
         where: 'empleado_id = ? AND fecha = ?',
