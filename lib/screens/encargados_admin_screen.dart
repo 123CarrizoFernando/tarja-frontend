@@ -56,6 +56,7 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
   }
 
   Future<void> _crearEncargado(
+    String nombreCompleto,
     String usuario,
     String password,
     String rol,
@@ -75,6 +76,7 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
           'Content-Type': 'application/json',
         },
         body: json.encode({
+          "nombre_completo": nombreCompleto,
           "usuario": usuario,
           "password": password,
           "rol": rol,
@@ -108,9 +110,10 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
   }
 
   void _mostrarDialogoNuevoEncargado() {
+    final nombreController = TextEditingController();
     final usuarioController = TextEditingController();
     final passwordController = TextEditingController();
-    String rolSeleccionado = "encargado";
+    String rolSeleccionado = "reportes";
     int? sectorSeleccionado;
 
     showDialog(
@@ -124,6 +127,13 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    TextField(
+                      controller: nombreController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre y Apellido del Operador',
+                      ),
+                    ),
                     TextField(
                       controller: usuarioController,
                       decoration: const InputDecoration(
@@ -141,17 +151,25 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                     DropdownButtonFormField<String>(
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: 'Tipo de Cuenta',
+                        labelText: 'Nivel de Permiso',
                       ),
                       value: rolSeleccionado,
                       items: const [
                         DropdownMenuItem(
-                          value: "encargado",
-                          child: Text("Encargado de Sector"),
+                          value: "reportes",
+                          child: Text("1. Solo Reportes (PDF/Excel)"),
+                        ),
+                        DropdownMenuItem(
+                          value: "carga",
+                          child: Text("2. Carga Padrón + Reportes"),
                         ),
                         DropdownMenuItem(
                           value: "admin",
-                          child: Text("ADMINISTRADOR"),
+                          child: Text("3. ADMINISTRADOR TOTAL"),
+                        ),
+                        DropdownMenuItem(
+                          value: "encargado",
+                          child: Text("4. Encargado de Sector (Cuadrilla)"),
                         ),
                       ],
                       onChanged: (valor) {
@@ -195,14 +213,16 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
+                    final nomOk = nombreController.text.trim().isNotEmpty;
                     final userOk = usuarioController.text.trim().isNotEmpty;
                     final passOk = passwordController.text.trim().isNotEmpty;
                     final sectorOk =
                         rolSeleccionado != "encargado" ||
                         sectorSeleccionado != null;
 
-                    if (userOk && passOk && sectorOk) {
+                    if (nomOk && userOk && passOk && sectorOk) {
                       _crearEncargado(
+                        nombreController.text.trim(),
                         usuarioController.text.trim(),
                         passwordController.text.trim(),
                         rolSeleccionado,
@@ -211,7 +231,7 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Colors.indigo,
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('Crear Cuenta'),
@@ -224,21 +244,33 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
     );
   }
 
+  String _descripcionRol(String rol) {
+    if (rol == 'admin') return "ADMIN TOTAL";
+    if (rol == 'carga' || rol == 'rrhh') return "CARGA + REPORTES";
+    if (rol == 'reportes') return "SOLO REPORTES";
+    return "ENCARGADO";
+  }
+
+  Color _colorRol(String rol) {
+    if (rol == 'admin') return Colors.redAccent;
+    if (rol == 'carga' || rol == 'rrhh') return Colors.green.shade700;
+    if (rol == 'reportes') return Colors.blue.shade700;
+    return Colors.indigo;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestión de Usuarios'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text('Cuentas de Usuarios y Permisos'),
+        backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Colors.deepPurple),
-            )
+          ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
           : RefreshIndicator(
               onRefresh: _cargarDatos,
-              color: Colors.deepPurple,
+              color: Colors.indigo,
               child: _encargados.isEmpty
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -253,38 +285,38 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
                       itemCount: _encargados.length,
                       itemBuilder: (context, index) {
                         final enc = _encargados[index];
-                        final esAdmin =
-                            enc['rol'] == 'admin' || enc['rol'] == 'rrhh';
+                        final rol = (enc['rol'] ?? 'encargado').toString();
+                        final nombreCompleto =
+                            (enc['nombre_completo'] ?? enc['usuario'])
+                                .toString();
 
                         return Card(
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: esAdmin
-                                  ? Colors.redAccent
-                                  : Colors.deepPurple,
+                              backgroundColor: _colorRol(rol),
                               child: Icon(
-                                esAdmin
-                                    ? Icons.admin_panel_settings
-                                    : Icons.badge,
+                                rol == 'encargado'
+                                    ? Icons.badge
+                                    : Icons.admin_panel_settings,
                                 color: Colors.white,
                               ),
                             ),
                             title: Text(
-                              enc['usuario'],
+                              nombreCompleto,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             subtitle: Text(
-                              esAdmin
-                                  ? "ADMINISTRADOR (Todos los sectores)"
-                                  : "Sector: ${enc['sector_nombre']}",
+                              "Usuario: ${enc['usuario']} • ${rol == 'encargado' ? 'Sector: ${enc['sector_nombre']}' : 'Acceso Global'}",
+                              style: const TextStyle(fontSize: 12),
                             ),
                             trailing: Text(
-                              esAdmin ? "ADMIN" : "ENCARGADO",
+                              _descripcionRol(rol),
                               style: TextStyle(
-                                color: esAdmin ? Colors.red : Colors.grey,
+                                color: _colorRol(rol),
                                 fontWeight: FontWeight.bold,
+                                fontSize: 11,
                               ),
                             ),
                           ),
@@ -294,7 +326,7 @@ class _EncargadosAdminScreenState extends State<EncargadosAdminScreen> {
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _mostrarDialogoNuevoEncargado,
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add),
         label: const Text("NUEVO USUARIO"),

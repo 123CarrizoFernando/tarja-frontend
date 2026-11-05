@@ -51,13 +51,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        final rol = (data['rol'] ?? 'encargado').toString();
+        final nombreOp = (data['nombre_completo'] ?? data['usuario'] ?? usuario)
+            .toString();
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', data['access_token']);
-        await prefs.setString('rol', data['rol'] ?? 'encargado');
+        await prefs.setString('rol', rol);
+        await prefs.setString('nombre_operador', nombreOp);
 
         if (!mounted) return;
 
-        if (data['rol'] == 'admin' || data['rol'] == 'rrhh') {
+        // Cualquier rol administrativo o de reportes entra al Panel Admin (que filtra los botones según el rol)
+        if (['admin', 'carga', 'reportes', 'rrhh'].contains(rol)) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const AdminScreen()),
@@ -106,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       errorBuilder: (_, __, ___) => const Icon(
                         Icons.account_balance,
                         size: 80,
-                        color: Colors.deepPurple,
+                        color: Colors.green,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -120,8 +126,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      "Acceso para Encargados y Administrador",
+                      "Acceso Institucional de Personal y Cuadrillas",
                       style: TextStyle(color: Colors.grey, fontSize: 13),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
                     TextField(
@@ -152,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _iniciarSesion,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: Colors.green.shade700,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(

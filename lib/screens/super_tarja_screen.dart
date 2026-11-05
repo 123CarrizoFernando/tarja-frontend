@@ -166,45 +166,88 @@ class _SuperTarjaScreenState extends State<SuperTarjaScreen> {
   }
 
   Future<void> _exportarExcel(List<dynamic> datos) async {
-    try {
-      // Ordenar primero por sector y luego por nombre
-      final listaOrdenada = List<dynamic>.from(datos);
-      listaOrdenada.sort(
-        (a, b) => (a['sector'] ?? '').toString().compareTo(
-          (b['sector'] ?? '').toString(),
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                "Seleccione el tipo de Excel (.CSV)",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.today, color: Colors.green),
+              title: const Text("1. Excel de Asistencia Diaria"),
+              subtitle: const Text(
+                "Con Horas Trabajadas y Horas Restadas del Día",
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _descargarCsvServidor(esMensualHacienda: false);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance, color: Colors.teal),
+              title: const Text("2. Excel Mensual para Hacienda"),
+              subtitle: const Text(
+                "Todos los sectores juntos (CUIL, Secretaría, Función, Horas Mes y Restantes)",
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _descargarCsvServidor(esMensualHacienda: true);
+              },
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 
-      String csv =
-          "MUNICIPALIDAD DE TARTAGAL - REPORTE DE TARJA (${_formatearPantalla(_fechaSeleccionada)})\n\n";
-      String? sectorActual;
+  Future<void> _descargarCsvServidor({required bool esMensualHacienda}) async {
+    setState(() => _isLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final fechaStr = _formatearFecha(_fechaSeleccionada);
 
-      for (var a in listaOrdenada) {
-        final sec = (a['sector'] ?? 'Sin Sector').toString();
-        if (sec != sectorActual) {
-          if (sectorActual != null) csv += "\n";
-          sectorActual = sec;
-          csv += "SECTOR: ${sectorActual.toUpperCase()}\n";
-          csv += "Legajo;DNI;Apellido y Nombre;Entrada;Salida Exigida (6hs);Salida Real;Horas Trabajadas;Estado\n";
-        }
-        csv +=
-            "'${a['legajo'] ?? '-'};${a['dni'] ?? '-'};${a['nombre']};${a['hora_llegada'] ?? '-'};${a['salida_estimada'] ?? '-'};${a['hora_salida'] ?? 'Trabajando'};${a['tiempo_trabajado'] ?? '00h 00m'};${a['estado']}\n";
+      String url = esMensualHacienda
+          ? '$baseUrl/rrhh/exportar-mensual-hacienda?desde=$fechaStr'
+          : '$baseUrl/rrhh/exportar-diario?desde=$fechaStr&hasta=$fechaStr';
+
+      if (_sectorFiltro != null) {
+        url += '&sector_id=$_sectorFiltro';
       }
 
-      final bytes = utf8.encode(csv);
-      final bom = [0xEF, 0xBB, 0xBF];
-
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File(
-        '${dir.path}/Planilla_Tarja_${_formatearFecha(_fechaSeleccionada)}.csv',
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $token'},
       );
-      await file.writeAsBytes([...bom, ...bytes]);
-      OpenFile.open(file.path);
+
+      if (response.statusCode == 200) {
+        final dir = await getApplicationDocumentsDirectory();
+        final nombreArchivo = esMensualHacienda
+            ? 'Liquidacion_Hacienda_$fechaStr.csv'
+            : 'Asistencia_Diaria_$fechaStr.csv';
+        final file = File('${dir.path}/$nombreArchivo');
+        await file.writeAsBytes(response.bodyBytes);
+        await OpenFile.open(file.path);
+      } else {
+        throw Exception("Error al generar el archivo Excel");
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error al exportar: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

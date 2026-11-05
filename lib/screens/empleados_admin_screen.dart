@@ -14,8 +14,10 @@ class EmpleadosAdminScreen extends StatefulWidget {
 class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
   List<dynamic> _empleados = [];
   List<dynamic> _sectores = [];
+  List<dynamic> _secretarias = [];
+  List<dynamic> _funciones = [];
   bool _isLoading = false;
-  String _busqueda = ""; // <-- NUEVO: Variable para el buscador
+  String _busqueda = "";
   final String baseUrl = "https://tarja-api.onrender.com";
 
   @override
@@ -24,34 +26,32 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
     _cargarDatos();
   }
 
+  String _soloNumeros(String val) => val.replaceAll(RegExp(r'[^0-9]'), '');
+
   Future<void> _cargarDatos() async {
-    // ARREGLO: Siempre verificamos si está montado antes de actualizar la pantalla
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
+    if (mounted) setState(() => _isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
+      final headers = {'Authorization': 'Bearer $token'};
 
-      final respEmpleados = await http.get(
-        Uri.parse('$baseUrl/admin/empleados'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final resultados = await Future.wait([
+        http.get(Uri.parse('$baseUrl/admin/empleados'), headers: headers),
+        http.get(Uri.parse('$baseUrl/admin/sectores'), headers: headers),
+        http.get(Uri.parse('$baseUrl/admin/secretarias'), headers: headers),
+        http.get(Uri.parse('$baseUrl/admin/funciones'), headers: headers),
+      ]);
 
-      final respSectores = await http.get(
-        Uri.parse('$baseUrl/admin/sectores'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (respEmpleados.statusCode == 200 && respSectores.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            _empleados = json.decode(respEmpleados.body);
-            _sectores = json.decode(respSectores.body);
-          });
-        }
+      if (resultados[0].statusCode == 200 && mounted) {
+        setState(() {
+          _empleados = json.decode(resultados[0].body);
+          if (resultados[1].statusCode == 200)
+            _sectores = json.decode(resultados[1].body);
+          if (resultados[2].statusCode == 200)
+            _secretarias = json.decode(resultados[2].body);
+          if (resultados[3].statusCode == 200)
+            _funciones = json.decode(resultados[3].body);
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -59,64 +59,55 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
             .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ¡FUNCIÓN UNIFICADA! Sirve para CREAR o para EDITAR dependiendo si le pasamos el ID
   Future<void> _guardarEmpleado(
     String nombre,
     String dni,
     String legajo,
-    int sectorId, {
+    int sectorId,
+    String secretaria,
+    String funcion, {
     int? idEdicion,
   }) async {
     Navigator.pop(context);
-
-    // ARREGLO: Check de mounted
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
+    if (mounted) setState(() => _isLoading = true);
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       final datosJson = json.encode({
-        "nombre_completo": nombre,
-        "dni": dni,
-        "legajo": legajo,
+        "nombre_completo": nombre.toUpperCase(),
+        "dni": _soloNumeros(dni),
+        "legajo": _soloNumeros(legajo),
         "sector_id": sectorId,
+        "secretaria": secretaria,
+        "funcion": funcion,
       });
 
-      http.Response response;
+      final url = idEdicion == null
+          ? '$baseUrl/admin/empleados'
+          : '$baseUrl/admin/empleados/$idEdicion';
 
-      if (idEdicion == null) {
-        // CREAR NUEVO
-        response = await http.post(
-          Uri.parse('$baseUrl/admin/empleados'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-          body: datosJson,
-        );
-      } else {
-        // EDITAR EXISTENTE
-        response = await http.put(
-          Uri.parse('$baseUrl/admin/empleados/$idEdicion'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-          body: datosJson,
-        );
-      }
+      final response = idEdicion == null
+          ? await http.post(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+              body: datosJson,
+            )
+          : await http.put(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+              body: datosJson,
+            );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
@@ -124,8 +115,8 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
             SnackBar(
               content: Text(
                 idEdicion == null
-                    ? 'Empleado creado con éxito'
-                    : 'Empleado actualizado',
+                    ? 'Agente registrado con éxito'
+                    : 'Agente actualizado',
               ),
               backgroundColor: Colors.green,
             ),
@@ -133,12 +124,8 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
         }
         await _cargarDatos();
       } else {
-        try {
-          final error = json.decode(response.body);
-          throw Exception(error['detail'] ?? "Error al guardar");
-        } catch (_) {
-          throw Exception("Error del servidor (${response.statusCode}).");
-        }
+        final error = json.decode(response.body);
+        throw Exception(error['detail'] ?? "Error al guardar");
       }
     } catch (e) {
       if (mounted) {
@@ -147,28 +134,46 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
         );
       }
     } finally {
-      // ARREGLO: Check de mounted
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ¡POPUP INTELIGENTE! Si le pasas un empleado, rellena los campos.
   void _mostrarDialogoEmpleado({Map<String, dynamic>? empleadoExistente}) {
     final esEdicion = empleadoExistente != null;
     final nombreController = TextEditingController(
       text: esEdicion ? empleadoExistente['nombre_completo'] : '',
     );
     final dniController = TextEditingController(
-      text: esEdicion ? empleadoExistente['dni'].toString() : '',
+      text: esEdicion
+          ? _soloNumeros((empleadoExistente['dni'] ?? '').toString())
+          : '',
     );
     final legajoController = TextEditingController(
-      text: esEdicion ? empleadoExistente['legajo'].toString() : '',
+      text: esEdicion
+          ? _soloNumeros((empleadoExistente['legajo'] ?? '').toString())
+          : '',
     );
     int? sectorSeleccionado = esEdicion ? empleadoExistente['sector_id'] : null;
+
+    final listaNombresSec = _secretarias
+        .map<String>((s) => s['nombre'].toString())
+        .toList();
+    if (!listaNombresSec.contains("GOBIERNO")) listaNombresSec.add("GOBIERNO");
+    String secretariaSel = esEdicion
+        ? (empleadoExistente['secretaria'] ?? 'GOBIERNO').toString()
+        : listaNombresSec.first;
+    if (!listaNombresSec.contains(secretariaSel))
+      listaNombresSec.add(secretariaSel);
+
+    final listaNombresFun = _funciones
+        .map<String>((f) => f['nombre'].toString())
+        .toList();
+    if (!listaNombresFun.contains("ADMINISTRATIVA"))
+      listaNombresFun.add("ADMINISTRATIVA");
+    String funcionSel = esEdicion
+        ? (empleadoExistente['funcion'] ?? 'ADMINISTRATIVA').toString()
+        : listaNombresFun.first;
+    if (!listaNombresFun.contains(funcionSel)) listaNombresFun.add(funcionSel);
 
     showDialog(
       context: context,
@@ -176,29 +181,50 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              title: Text(esEdicion ? 'Editar Empleado' : 'Nuevo Empleado'),
+              title: Text(esEdicion ? 'Editar Agente' : 'Nuevo Agente'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
                       controller: nombreController,
-                      textCapitalization: TextCapitalization.words,
+                      textCapitalization: TextCapitalization.characters,
                       decoration: const InputDecoration(
-                        labelText: 'Nombre y Apellido',
+                        labelText: 'Apellido y Nombre',
                       ),
                     ),
                     TextField(
                       controller: dniController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'DNI'),
+                      decoration: const InputDecoration(
+                        labelText: 'DNI (Sin puntos)',
+                      ),
                     ),
                     TextField(
                       controller: legajoController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Legajo'),
+                      decoration: const InputDecoration(
+                        labelText: 'CUIL (Solo números, sin guiones)',
+                      ),
                     ),
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Secretaría',
+                      ),
+                      value: secretariaSel,
+                      items: listaNombresSec.map((s) {
+                        return DropdownMenuItem(
+                          value: s,
+                          child: Text(s, overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) setStateDialog(() => secretariaSel = v);
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Sector'),
@@ -212,10 +238,22 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
                           ),
                         );
                       }).toList(),
-                      onChanged: (valor) {
-                        setStateDialog(() {
-                          sectorSeleccionado = valor;
-                        });
+                      onChanged: (valor) =>
+                          setStateDialog(() => sectorSeleccionado = valor),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Función'),
+                      value: funcionSel,
+                      items: listaNombresFun.map((f) {
+                        return DropdownMenuItem(
+                          value: f,
+                          child: Text(f, overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) setStateDialog(() => funcionSel = v);
                       },
                     ),
                   ],
@@ -240,6 +278,8 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
                         dniController.text.trim(),
                         legajoController.text.trim(),
                         sectorSeleccionado!,
+                        secretariaSel,
+                        funcionSel,
                         idEdicion: esEdicion ? empleadoExistente['id'] : null,
                       );
                     }
@@ -262,14 +302,17 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
   Widget build(BuildContext context) {
     final empleadosFiltrados = _empleados.where((emp) {
       final query = _busqueda.toLowerCase();
-      final nombre = emp['nombre_completo'].toString().toLowerCase();
-      final legajo = emp['legajo'].toString().toLowerCase();
-      return nombre.contains(query) || legajo.contains(query);
+      final nombre = (emp['nombre_completo'] ?? '').toString().toLowerCase();
+      final legajo = (emp['legajo'] ?? '').toString().toLowerCase();
+      final dni = (emp['dni'] ?? '').toString().toLowerCase();
+      return nombre.contains(query) ||
+          legajo.contains(query) ||
+          dni.contains(query);
     }).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestión de Empleados'),
+        title: const Text('Padrón de Empleados'),
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
       ),
@@ -279,7 +322,7 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
             padding: const EdgeInsets.all(8.0),
             child: TextField(
               decoration: InputDecoration(
-                labelText: 'Buscar por nombre o legajo',
+                labelText: 'Buscar por DNI, Apellido o CUIL',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -287,11 +330,7 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
                 filled: true,
                 fillColor: Colors.grey.shade100,
               ),
-              onChanged: (valor) {
-                setState(() {
-                  _busqueda = valor;
-                });
-              },
+              onChanged: (valor) => setState(() => _busqueda = valor),
             ),
           ),
           Expanded(
@@ -316,11 +355,17 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
                             itemCount: empleadosFiltrados.length,
                             itemBuilder: (context, index) {
                               final emp = empleadosFiltrados[index];
+                              final cuilLimpio = _soloNumeros(
+                                (emp['legajo'] ?? '').toString(),
+                              );
                               return Card(
                                 child: ListTile(
                                   leading: const CircleAvatar(
                                     backgroundColor: Colors.green,
-                                    child: Icon(Icons.person, color: Colors.white),
+                                    child: Icon(
+                                      Icons.person,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                   title: Text(
                                     emp['nombre_completo'],
@@ -329,10 +374,15 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    "Legajo: ${emp['legajo']} - Sector: ${emp['sector_nombre']}",
+                                    "DNI: ${emp['dni'] ?? 'Falta DNI'} | CUIL: $cuilLimpio\n${emp['secretaria'] ?? 'GOBIERNO'} • ${emp['sector_nombre']} (${emp['funcion'] ?? 'ADMINISTRATIVA'})",
+                                    style: const TextStyle(fontSize: 12),
                                   ),
+                                  isThreeLine: true,
                                   trailing: IconButton(
-                                    icon: const Icon(Icons.edit, color: Colors.blue),
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      color: Colors.blue,
+                                    ),
                                     onPressed: () => _mostrarDialogoEmpleado(
                                       empleadoExistente: emp,
                                     ),
@@ -348,10 +398,8 @@ class _EmpleadosAdminScreenState extends State<EmpleadosAdminScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _sectores.isEmpty
             ? () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Debe crear un sector primero'),
-                  ),
-                )
+                const SnackBar(content: Text('Debe crear un sector primero')),
+              )
             : () => _mostrarDialogoEmpleado(),
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
